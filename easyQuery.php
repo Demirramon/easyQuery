@@ -1,272 +1,311 @@
 <?php
-	GLOBAL $easyQueryError;
-	
-	if (!function_exists('easyQuery')) {
-		
+
+	// Funció per fer consultes facilment
+	if (!function_exists("easyQuery")) {
+
 		/* Variable que utilitza easyQuery i easyQueryError */
-		GLOBAL $easyQueryData;
+		GLOBAL $easyQueryData, $easyQueryError;
 		$easyQueryData = array();
-	
-		/* Funció per a fer operacions amb la base de dades molt mes facilment.
+
+		/**
+		 * Funció que facilita les operacions amb la base de dades i el tractament d'errors.
 		 *
-		 * $conn ---> objecte mysqli de la connexió amb la base de dades.
-		 *            Exemple: $conn = new mysqli($database_servername, $database_username, $database_password, $database_name);
-		 * $query --> String amb la consulta/operació.
-		 * $params -> Array amb les dades que es faríen servir en el bind_param. El primer valor ha de ser el string amb les lletres que representen els tipus de dades.
-		 *            Cada lletra representa una variable: "s" per string i "i" per integer. Si no necesites cap paràmetre, posa un null.
-		 *            Exemple: array("iisi", $nombre1, $nombre2, $string, $nombre3);
-		 * $return -> Tipus de claus de l'array que es retorna. Si es "i" els resultats seràn arrays numerats, si es "s" les claus seràn els noms de les columnes.
-		 *            Si es reb un enter (per raons de compatibilitat) o ningún valor serà "i".
+		 * @param object $conn objecte mysqli de la connexió amb la base de dades.
 		 *
-		 * Returns: array bidimensional amb els resultats. El primer index de l'array es el numero del resultat, el segon es el numero del valor retornat.
-		 *          $resultat[0] -> (array) primer resultat.
-		 *          $resultat[2][1] -> Segona variable del tercer resultat.
-		 *          Si la consulta falla es retorna false.
+		 * @param string $query String amb la consulta/operació.
+		 *
+		 * @param array $params Array amb els paràmetres de bind_param o NULL.
+		 *                      El primer valor ha de ser el string amb els caràcters que representen els tipus de dades.
+		 *                      Si no s'ha d'enllaçar cap paràmetre es pot passar NULL.
+		 *
+		 * @param string $return Tipus de claus de l'array que es retorna. Si es "i" els resultats seràn arrays numerats, si es "s" les claus seràn els noms de les columnes.
+		 *                       Per motiu de compatibilitat amb versions anteriors, si es reb un enter o ningún valor serà "i" per defecte.
+		 *
+		 * @return mixed Si la consulta s'executa correctament i retorna valors es retornarà un array bidimensional que contindrà les files, i les files contindràn les columnes.
+		 *               Si la consulta falla es retornarà FALSE.
+		 *               Si una operació d'escriptura s'executa correctament es retornarà TRUE.
+		 *               Si la consulta s'executa correctament pero no retorna cap valor es retornarà NULL.
 		 */
-		function easyQuery($conn, $query, $params = null, $return = null) {
-			
-			GLOBAL $easyQueryData; // En cas d'error, aquesta variable ha de ser global per poder recuperar el missatge d'error.
-			
-			if (is_numeric($return)) return easyQueryLegacy($conn, $query, $params, $return);
-			
-			//if (is_numeric($return)) $return = "i";
-			
-			$qdata = array(
+		function easyQuery($conn, $query, $params = null, $tipus_return = "i") {
+
+			GLOBAL $easyQueryData; // Dades de les consultes executades.
+			GLOBAL $easyQueryError; // Compatibilitat
+
+			if (is_numeric($tipus_return)) {
+				if ($tipus_return > 0) $tipus_return = "i";
+				else                   $tipus_return = null;
+			}
+
+			// Array amb informació de la operació actual
+			$qdata = [
 				/*"connection" => $conn,*/
-				"query" => $query,
+				"query"      => $query,
 				"parameters" => $params,
-				"return" => $return,
-				"error" => ""
-			);
-			
-			if ($sqlp=$conn->prepare($query)) {
-				
-				if ($params != NULL) {
-					
-					/* Control d'errors */
-					
-					$to_replace = substr_count($query, "?");
-					$params_n   = count($params) - 1;
-					$params_n2  = strlen($params[0]);
-					
-					if ($to_replace != $params_n || $params_n != $params_n2) {
-						
-						$qdata["error"] .= "Error assignant els paràmetres, la quantitat de ? (" . $to_replace . ") i de parámetres (" . $params_n . ", " . $params_n2 . ") no coincideix. ";
-						$easyQueryData[] = $qdata;
-						return false;
-						
-					}
-					
-					/* Assignació de parámetres */
-					
-					$bind = '$bind_param = $sqlp->bind_param("' . $params[0] . '"';
-					
-					for ($i=1; $i < count($params); $i++) {
-						$bind .= ', $params['.$i.']';
-					}
-					
-					$bind .= ');';
-					
-					eval($bind);
-					
-					if ($bind_param == false) $qdata["error"] .= "Els parametres no s'han pogut enllaçar: " . mysqli_error($conn) . " ";
-					
-				}
-				
-				if ($sqlp->execute()) {
-					
-					$results = $sqlp->get_result();
-					
-					if (is_bool($results)) {
-						$easyQueryData[] = $qdata;
-						return $results;
-					}
-					
-					$rows = $results->num_rows;
-					$return_array = array();
-					
-					while ($row = $results->fetch_assoc()) {
-						$return_array[] = $row;
-					}
-					
-					if (count($return_array) > 0) {
-						
-						switch ($return) {
-							
-							case "s":
-								// Res, ja està preparat
-								break;
-							
-							case "i":
-							default:
-								foreach ($return_array as $key => $value) {
-									$new_array = array();
-									foreach ($value as $key2 => $value2) {
-										$new_array[] = $value2;
-									}
-									$return_array[$key] = $new_array;
-								}
-							
-						}
-						
-						$easyQueryData[] = $qdata;
-						return $return_array;
-						
-					} else if ($return == 0) {
-						
-						return true;
-						
-					} else {
-						
-						$qdata["error"] .= "No s'ha retornat cap resultat.";
-						$easyQueryData[] = $qdata;
-						return null;
-						
-					}
-					
-				} else {
-					$qdata["error"] .= "Error d'execució: " . mysqli_error($conn) . " ";
-					$easyQueryData[] = $qdata;
-					return false;
-				}
-			} else {
-				$qdata["error"] .= "Error de preparació: " . mysqli_error($conn) . " ";
+				"return"     => $tipus_return,
+				"error"      => "",
+				"start"      => microtime(true),
+				"end"        => null,
+				"time"       => null
+			];
+
+			// Comprovació de la variable de connexió
+			if ($conn == null || gettype($conn) != "object" || !($conn instanceof mysqli) || $conn->connect_error) {
+
+				if ($conn == null)                   $qdata["error"] .= "El paràmetre de connexió es null. ";
+				else if (gettype($conn) != "object") $qdata["error"] .= "El paràmetre de connexió no es un objecte (" . gettype($conn) . "). ";
+				else if (!($conn instanceof mysqli)) $qdata["error"] .= "El paràmetre de connexió no es una instancia de mysqli. ";
+				else if ($conn->connect_error)       $qdata["error"] .= "El paràmetre de connexió te connect_error. ";
+
+				$easyQueryData[] = $qdata;
+				return false;
+
+			}
+
+			// Comprovació de la variable de la consulta
+			if ($query == null) {
+				$qdata["error"] .= "La consulta es buida.";
 				$easyQueryData[] = $qdata;
 				return false;
 			}
-			
+
+			// Addició de comentari a la consulta per a facilitar el debug des de phpmyadmin
+			//$query .= "\n\n# Consulta easyQuery | Usuari executor: " . (isset($_SESSION["pauser"]) ? $_SESSION["pauser"] : "(unknown)");
+
+			// Preparació de la consulta
+			if ($sqlp = @$conn->prepare($query)) {
+
+				// Assignació de paràmetres (si n'hi ha)
+				if ($params != NULL) {
+
+					// Creem referencies
+					$params_ref = [];
+					foreach($params as $key => $value) $params_ref[$key] = &$params[$key];
+
+					// Executem el bind_param
+					$bind_param = call_user_func_array([$sqlp, "bind_param"], $params_ref);
+
+					// Control d'errors
+					if ($bind_param == false) {
+						$qdata["error"] .= "Els parametres no s'han pogut enllaçar: " . mysqli_error($conn);
+						$easyQueryData[] = $qdata;
+						return false;
+					}
+
+				}
+
+				// Execució de la consulta
+				if ($sqlp->execute()) {
+
+					if ($tipus_return == null) {
+
+						// Si el return es NULL significa que no s'espera cap valor
+						// Això s'utilitza quan es fan operacions d'escriptura
+						// Retornem les files afectades per la operació
+
+						$affected_rows = mysqli_affected_rows($conn);
+
+						$qdata["end"] = microtime(true);
+						$qdata["time"] = $qdata["end"] - $qdata["start"];
+						$easyQueryData[] = $qdata;
+
+						return $affected_rows;
+
+					} else {
+
+						$results = $sqlp->get_result();
+
+						if (is_bool($results)) {
+
+							// Si retorna un booleà en comptes d'un objecte retornem el resultat pero guardem un error.
+
+							$qdata["error"] .= "Ha retornat booleà quan s'esperava un objecte.";
+							$qdata["end"] = microtime(true);
+							$qdata["time"] = $qdata["end"] - $qdata["start"];
+							$easyQueryData[] = $qdata;
+							return $results;
+
+						} else {
+
+							$rows = $results->num_rows;
+							$return_array = array();
+
+							while ($row = $results->fetch_assoc()) {
+								$return_array[] = $row;
+							}
+
+							if (count($return_array) > 0) {
+
+								// Si s'ha retornat alguna cosa es formata tal com s'ha demanat en el paràmetre $tipus_return
+
+								switch ($tipus_return) {
+
+									case "s":
+										// Per defecte ja està formatat aixó
+										break;
+
+									case "i":
+									default:
+										// Es crea un altre array on es canvien les claus nominals per numériques
+										foreach ($return_array as $key => $value) {
+											$new_array = [];
+											foreach ($value as $key2 => $value2) $new_array[] = $value2;
+											$return_array[$key] = $new_array;
+										}
+
+								}
+
+								// Es guarda el temps de finalització i es retornen els resultats
+
+								$qdata["end"] = microtime(true);
+								$qdata["time"] = $qdata["end"] - $qdata["start"];
+								$easyQueryData[] = $qdata;
+
+								return $return_array;
+
+							} else {
+
+								// Si no es retorna res guardem un missatge d'avís i el temps de finalització i retornem NULL
+								// Es retorna NULL i no FALSE perque no es un error com a tal
+
+								$qdata["error"] .= "No s'ha retornat cap resultat.";
+								$qdata["end"] = microtime(true);
+								$qdata["time"] = $qdata["end"] - $qdata["start"];
+								$easyQueryData[] = $qdata;
+								return null;
+
+							}
+
+						}
+
+					}
+
+				} else {
+
+					// No s'ha pogut executar la query, guardem l'error i el temps de finalització i retornem FALSE
+
+					$qdata["error"] .= "Error d'execució: " . mysqli_error($conn) . " ";
+					$qdata["end"] = microtime(true);
+					$qdata["time"] = $qdata["end"] - $qdata["start"];
+					$easyQueryData[] = $qdata;
+					return false;
+
+				}
+
+			} else {
+
+				// No s'ha pogut preparar la query, guardem l'error i el temps de finalització i retornem FALSE
+
+				$qdata["error"] .= "Error de preparació: " . @mysqli_error($conn) . " ";
+				$qdata["end"] = microtime(true);
+				$qdata["time"] = $qdata["end"] - $qdata["start"];
+				$easyQueryData[] = $qdata;
+				return false;
+			}
+
+			// La funció mai hauria d'arribar a aquest punt perque totes les casualistiques acaben en return
+			// Tot i així, es guarda un missatge d'error per si acàs
+
 			if ($qdata["error"] == "") $qdata["error"] = "La funció s'ha executat fins al final. Error report: " . mysqli_error($conn) . " ";
+			$qdata["end"] = microtime(true);
+			$qdata["time"] = $qdata["end"] - $qdata["start"];
 			$easyQueryData[] = $qdata;
-			
+
+			// Compatibility
+			$easyQueryError = easyQueryError();
+
 		}
-	
+
+
+		/* Funció que retorna un array amb totes les dades de la última consulta (o del número de consulta especificat) */
+		function easyQueryData($n = null, $key = null) {
+
+			GLOBAL $easyQueryData;
+
+			$max = count($easyQueryData) - 1;
+
+			// Si $n es null vol dir que es retornarà l'ultima entrada de l'array de dades
+			if ($n === null) {
+
+				if ($key === null) {
+
+					return $easyQueryData[$max];
+
+				} else {
+
+					if (isset($easyQueryData[$max][$key])) return $easyQueryData[$max][$key];
+					else                                   return null;
+
+				}
+
+
+			// Si $n es true es retornarà un array amb totes les dades o amb les que es demanin
+			} else if ($n === true) {
+
+				if ($key === null) {
+
+					return $easyQueryData;
+
+				} else {
+
+					$array_return = [];
+
+					foreach ($easyQueryData as $i => $queryData) {
+						if (isset($queryData[$key])) $array_return[] = $queryData[$key];
+						else                         $array_return[] = null;
+					}
+
+					return $array_return;
+
+				}
+
+
+			// Si $n es un número es retornarà les dades d'aquella consulta (o false si no existeix)
+			} else if (is_numeric($n)) {
+
+				if ($n > $max || $n < 0) {
+
+					return false;
+
+				} else {
+
+					if ($key === null) {
+
+						return $easyQueryData[$n];
+
+					} else {
+
+						if (isset($easyQueryData[$n][$key])) return $easyQueryData[$n][$key];
+						else                                 return null;
+
+					}
+
+				}
+
+			// Si no encaixa en cap cas es retornarà false
+			} else {
+
+				return false;
+
+			}
+
+			//return $easyQueryData[$n];
+
+		}
+
 		/* Funció que retorna l'error de la última consulta (o del número de consulta especificat) */
 		function easyQueryError($n = null) {
-			GLOBAL $easyQueryData;
-			$max = count($easyQueryData) - 1;
-			if ($n == null || $n > $max) $n = $max;
-			return $easyQueryData[$n]["error"];
+
+			return easyQueryData($n, "error");
+
 		}
-	
-		/* Funció que retorna un array amb totes les dades de la última consulta */
-		function easyQueryInfo($n = null) {
-			GLOBAL $easyQueryData;
-			$max = count($easyQueryData) - 1;
-			if ($n == null || $n > $max) $n = $max;
-			return $easyQueryData[$n];
+
+		/* Funció que retorna un array amb el temps que va portar la última consulta (o del número de consulta especificat) */
+		function easyQueryTime($n = null) {
+
+			return easyQueryData($n, "time");
+
 		}
-	
+
 	}
-	
-	/* Compatibilitat */
-	if (!function_exists("easyQueryLegacy")) {
-		
-		function easyQueryLegacy($conn, $query, $params, $return) {
-			
-			GLOBAL $easyQueryData; // En cas d'error, aquesta variable ha de ser global per poder recuperar el missatge d'error.
-			
-			$conn = db_connect();
-			
-			$qdata = array(
-				/*"connection" => $conn,*/
-				"query" => $query,
-				"parameters" => $params,
-				"return" => $return,
-				"error" => ""
-			);
-			
-			if ($sqlp=$conn->prepare($query)) {
-				
-				if ($params != NULL) {
-					
-					/* Control d'errors */
-					
-					$to_replace = substr_count($query, "?");
-					$params_n   = count($params) - 1;
-					$params_n2  = strlen($params[0]);
-					
-					if ($to_replace != $params_n || $params_n != $params_n2) {
-						
-						$qdata["error"] .= "Error assignant els paràmetres, la quantitat de ? (" . $to_replace . ") i de parámetres (" . $params_n . ", " . $params_n2 . ") no coincideix. ";
-						$easyQueryData[] = $qdata;
-						return false;
-						
-					}
-					
-					/* Assignació de parámetres */
-					
-					$bind = '$bind_param = $sqlp->bind_param("' . $params[0] . '"';
-					
-					for ($i=1; $i < count($params); $i++) {
-						$bind .= ', $params['.$i.']';
-					}
-					
-					$bind .= ');';
-					
-					eval($bind);
-					
-					if ($bind_param == false) $qdata["error"] .= "Els parametres no s'han pogut enllaçar: " . mysqli_error($conn) . " ";
-					
-				}
-				
-				if ($sqlp->execute()) {
-					$sqlp->store_result();
-					
-					if ($return > 0) {
-						
-						$bindresult = '$bind_result = $sqlp->bind_result(';
-						
-						for ($i=0; $i < $return; $i++) {
-							if ($i > 0) $bindresult .= ', ';
-							$bindresult .= '$data['.$i.']';
-						}
-						
-						$bindresult .= ');';
-						
-						eval($bindresult);
-						
-						if ($bind_result == false) $qdata["error"] .= "Els resultats no s'han pogut enllaçar: " . mysqli_error($conn) . " ";
-						
-						$i = 0;
-						while ($sqlp->fetch()) {
-							
-							for ($j=0; $j < count($data); $j++) {
-								$return_array[$i][$j] = $data[$j];
-							}
-							$i++;
-							
-						}
-						
-					} else {
-						$sqlp->fetch();
-					}
-					
-					if ($return > 0 && isset($return_array)) {
-						$easyQueryData[] = $qdata;
-						return $return_array;
-					} else if ($return == 0) {
-						$easyQueryData[] = $qdata;
-						return true;
-					} else {
-						$qdata["error"] .= "La consulta no ha retornat cap resultat. ";
-						$easyQueryData[] = $qdata;
-						return null;
-					}
-					
-				} else {
-					$qdata["error"] .= "Error d'execució: " . mysqli_error($conn) . " ";
-					$easyQueryData[] = $qdata;
-					return false;
-				}
-			} else {
-				$qdata["error"] .= "Error de preparació: " . mysqli_error($conn) . " ";
-				$easyQueryData[] = $qdata;
-				return false;
-			}
-			
-			if ($qdata["error"] == "") $qdata["error"] = "La funció s'ha executat fins al final. Error report: " . mysqli_error($conn) . " ";
-			$easyQueryData[] = $qdata;
-			
-		}
-	}
+
 ?>
