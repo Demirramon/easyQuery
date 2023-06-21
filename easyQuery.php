@@ -27,15 +27,12 @@ class mysqlpro extends mysqli {
 	 *               If a writing operation succeeds it will return the number of affected rows. Note that it can be 0 even if it succeeds.
 	 *               If the operation fails it will return FALSE.
 	 */
-	function easyQuery($query, $params = null, $return_type = "s") {
-
-		if (is_numeric($return_type) && $return_type > 0) $return_type = "i";
+	function easyQuery($query, $params = null) {
 
 		// Array containing the current operation's data
 		$qdata = [
 			"query"      => $query,
 			"parameters" => $params,
-			"return"     => $return_type,
 			"error"      => "",
 			"start"      => microtime(true),
 			"end"        => null,
@@ -162,21 +159,6 @@ class mysqlpro extends mysqli {
 			$results->free_result();
 
 			if (count($return_array) > 0) {
-
-				// If results have been returned we format it according to $return_type
-
-				switch ($return_type) {
-
-					case "i":
-						// We iterate the results array to remove the nominal keys and turn them numeric
-						foreach ($return_array as $key => $row) $return_array[$key] = array_values($row);
-
-					default:
-						// It already is formatted this way by default
-					break;
-
-				}
-
 
 				// We store the finish time and return the results
 				// We also store an error message (which isn't really an error) to log that everything went well
