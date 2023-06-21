@@ -4,101 +4,103 @@ GLOBAL $db, $db_VS, $db_AD, $db_COMU, $host;
 
 if (!function_exists("easyQuery")) {
 
-	/* Variable que utilitza easyQuery i easyQueryError */
+	/* Variable used by easyQuery and easyQueryError */
 	GLOBAL $easyQueryData;
 	$easyQueryData = array();
 
 	/**
-	 * Funció que facilita les operacions amb la base de dades i el tractament d'errors.
+	 * Function which facilitates the operations with the database and error control.
 	 *
-	 * @param object $conn Objecte mysqli de la connexió amb la base de dades.
+	 * @param object $conn  Connection to the database
 	 *
-	 * @param string $query String amb la consulta/operació.
+	 * @param string $query String with the query/operation.
 	 *
-	 * @param array $params Array amb els paràmetres de bind_param o NULL.
-	 *                      El primer valor ha de ser el string amb els caràcters que representen els tipus de dades i la resta els valors a enllaçar.
-	 *                      Si no s'ha d'enllaçar cap paràmetre es pot passar un array buit o NULL.
+	 * @param array $params Array containing the parameters used in bind_param, or NULL if not required.
+	 *                      The first value must be a String representing the type of the variables to bind.
+	 *                      The rest of the values are the variables to bind in order.
+	 *                      If no parameters have to be binded, a NULL or empty array can be passed.
 	 *
-	 * @param string $tipus_return ///A PUNT DE SER DEPRECAT/// En cas de ser un SELECT, tipus de claus de l'array que es retorna. Si es "i" els resultats seràn arrays numerats, si no les claus seràn els noms de les columnes.
+	 * @param string $return_type ///TO BE DEPRECATED/// If the query is a SELECT, kind of keys to use in the return.
+	 *                            If the value equals "i" the array will use numeric keys, if not it will use the column names.
 	 *
-	 * @return mixed Si la consulta s'executa correctament i retorna valors es retornarà un array bidimensional que contindrà les files, i les files contindràn les columnes.
-	 *               Si la consulta s'executa correctament pero no retorna cap valor es retornarà un array buit.
-	 *               Si una operació d'escriptura s'executa correctament es retornarà el nombre de files afectades.
-	 *               Si la consulta falla es retornarà FALSE.
+	 * @return mixed If a query succeeds and returns something it will be a bidimensional array containing rows, which will contain the column values.
+	 *               If a query succeeds but returns nothing it will return an empty array.
+	 *               If a writing operation succeeds it will return the number of affected rows. Note that it can be 0 even if it succeeds.
+	 *               If the operation fails it will return FALSE.
 	 */
-	function easyQuery($conn, $query, $params = null, $tipus_return = "s") {
+	function easyQuery($conn, $query, $params = null, $return_type = "s") {
 
-		GLOBAL $easyQueryData; // En cas d'error, aquesta variable ha de ser global per poder recuperar el missatge d'error.
+		GLOBAL $easyQueryData; // In case of error, this variable must be global to store the details.
 
-		if (is_numeric($tipus_return) && $tipus_return > 0) $tipus_return = "i";
+		if (is_numeric($return_type) && $return_type > 0) $return_type = "i";
 
-		// Array amb informació de la operació actual
+		// Array containing the current operation's data
 		$qdata = [
 			/*"connection" => $conn,*/
 			"query"      => $query,
 			"parameters" => $params,
-			"return"     => $tipus_return,
+			"return"     => $return_type,
 			"error"      => "",
 			"start"      => microtime(true),
 			"end"        => null,
 			"time"       => null
 		];
 
-		// Comprovació de la variable de connexió
+		// Checking the connection variable
 		if ($conn == null || !($conn instanceof mysqli) || gettype($conn) != "object" || $conn->connect_error) {
 
-			if      ($conn == null)              $qdata["error"] .= "El paràmetre de connexió es null. ";
-			else if (!($conn instanceof mysqli)) $qdata["error"] .= "El paràmetre de connexió no es una instancia de mysqli. ";
-			else if (gettype($conn) != "object") $qdata["error"] .= "El paràmetre de connexió no es un objecte (" . gettype($conn) . "). ";
-			else if ($conn->connect_error)       $qdata["error"] .= "El paràmetre de connexió te connect_error. ";
+			if      ($conn == null)              $qdata["error"] .= "The connection variable is null. ";
+			else if (!($conn instanceof mysqli)) $qdata["error"] .= "The connection variable is not a mysqli instance. ";
+			else if (gettype($conn) != "object") $qdata["error"] .= "The connection variable is not an object (" . gettype($conn) . "). ";
+			else if ($conn->connect_error)       $qdata["error"] .= "The connection variable has a connection error. ";
 
 			$easyQueryData[] = $qdata;
 			return false;
 
 		}
 
-		// Comprovació de la variable de la consulta
+		// Checking the operation variable
 		if ($query == null) {
-			$qdata["error"] .= "La consulta es buida.";
+			$qdata["error"] .= "The query is empty.";
 			$easyQueryData[] = $qdata;
 			return false;
 		}
 
-		// Addició de comentari a la consulta per a facilitar el debug des de phpmyadmin
-		$query .= "\n\n# Consulta easyQuery | Usuari executor: " . (isset($_SESSION["pauser"]) ? $_SESSION["pauser"] : "(unknown)");
+		// Adding a comment for a better debug through phpmyadmin
+		//$query .= "\n\n# easyQuery | Usuari executor: " . (isset($_SESSION["user"]) ? $_SESSION["user"] : "(unknown)");
 
-		// Si hi ha paràmetres a enllaçar fem prepare, enllaçem, i execute
+		// If there are parameters to bind we prepare, bind_param and execute
 		if (is_array($params) && count($params) > 0) {
 
-			// Preparació de la consulta
+			// We prepare the query
 			if ($sqlp = $conn->prepare($query)) {
 
-				// Assignació de paràmetres
+				// Parameter binding
 
-				// Creem referencies
+				// We create the references
 				$params_ref = [];
 				foreach($params as $key => $value) $params_ref[$key] = &$params[$key];
 
-				// Executem el bind_param
+				// bind_param execution
 				$bind_param = call_user_func_array([$sqlp, "bind_param"], $params_ref);
 
-				// Control d'errors
+				// Error control
 				if ($bind_param == false) {
-					$qdata["error"] .= "Els parametres no s'han pogut enllaçar: " . mysqli_error($conn);
+					$qdata["error"] .= "Parameters have not been binded: " . mysqli_error($conn);
 					$easyQueryData[] = $qdata;
 					return false;
 				}
 
-				// Execució de la consulta
+				// We execute the query
 				if ($sqlp->execute()) {
 
 					$results = $sqlp->get_result();
 
 				} else {
 
-					// No s'ha pogut executar la query, guardem l'error i el temps de finalització i retornem FALSE
+					// The query could not be executed. We store the details of the error, ending time and return FALSE.
 
-					$qdata["error"] .= "Error d'execució: " . mysqli_error($conn) . " ";
+					$qdata["error"] .= "Execute error: " . mysqli_error($conn) . " ";
 					$qdata["end"]    = microtime(true);
 					$qdata["time"]   = $qdata["end"] - $qdata["start"];
 					$easyQueryData[] = $qdata;
@@ -108,9 +110,9 @@ if (!function_exists("easyQuery")) {
 
 			} else {
 
-				// No s'ha pogut preparar la query, guardem l'error i el temps de finalització i retornem FALSE
+				// The query could not be prepared. We store the details of the error, ending time and return FALSE.
 
-				$qdata["error"] .= "Error de preparació: " . mysqli_error($conn) . " ";
+				$qdata["error"] .= "Prepare error: " . mysqli_error($conn) . " ";
 				$qdata["end"]    = microtime(true);
 				$qdata["time"]   = $qdata["end"] - $qdata["start"];
 				$easyQueryData[] = $qdata;
@@ -118,13 +120,13 @@ if (!function_exists("easyQuery")) {
 
 			}
 
-		// Si no hi ha paràmetres a enllaçar intentarem fer una query directament
-		// Aixo es fa per poder executar operacions com CHECK TABLE que no soporten els prepared statements
+		// If there are no parameters to bind we attempt to do a direct query
+		// This is done so operations like CHECK TABLE, which don't support prepared statements, can be executed
 		} else {
 
 			if (!($results = $conn->query($query, MYSQLI_STORE_RESULT))) {
 
-				$qdata["error"] .= "Error d'execució de query sense prepare: " . mysqli_error($conn) . " ";
+				$qdata["error"] .= "Execution error with no prepare: " . mysqli_error($conn) . " ";
 				$qdata["end"]    = microtime(true);
 				$qdata["time"]   = $qdata["end"] - $qdata["start"];
 				$easyQueryData[] = $qdata;
@@ -135,15 +137,15 @@ if (!function_exists("easyQuery")) {
 		}
 
 
-		// Tractem execucio
+		// We treat the execution
 
 		if (is_object($results)) $n_rows = $results->num_rows;
-		else                     $n_rows = null; // query directe que retorna bool
+		else                     $n_rows = null; // direct query which returns a bool
 
-		// Si el número de rows retornat es NULL significa que no es un SELECT
+		// If the number of rows equals NULL it means it was not a SELECT
 		if ($n_rows === null) {
 
-			// Retornem les files afectades per la operació
+			// We return the number of affected rows
 
 			$affected_rows = mysqli_affected_rows($conn);
 
@@ -153,10 +155,10 @@ if (!function_exists("easyQuery")) {
 
 			return $affected_rows;
 
-		// Si el número de rows retornat es major a 0 significa que s'han retornat resultats
+		// If the number of rows is bigger than zero it means results have been returned
 		} else if ($n_rows > 0) {
 
-			// Posem les files en un array per retornar-lo
+			// We put the rows in an array to return it
 
 			$return_array = array();
 
@@ -168,25 +170,25 @@ if (!function_exists("easyQuery")) {
 
 			if (count($return_array) > 0) {
 
-				// Si s'ha retornat alguna cosa es formata tal com s'ha demanat en el paràmetre $tipus_return
+				// If results have been returned we format it according to $return_type
 
-				switch ($tipus_return) {
+				switch ($return_type) {
 
 					case "i":
-						// Recorro l'array de resultats i borro les claus nominals per fer-les numèriques
+						// We iterate the results array to remove the nominal keys and turn them numeric
 						foreach ($return_array as $key => $row) $return_array[$key] = array_values($row);
 
 					default:
-						// Per defecte ja està formatat correctament
+						// It already is formatted this way by default
 					break;
 
 				}
 
 
-				// Es guarda el temps de finalització i es retornen els resultats
-				// Es guarda un missatge d'error (que realment no es un error) per deixar constancia de que tot ha anat be
+				// We store the finish time and return the results
+				// We also store an error message (which isn't really an error) to log that everything went well
 
-				$qdata["error"]  = "La funció s'ha executat correctament i s'han guardat els resultats.";
+				$qdata["error"]  = "The function has executed properly and the results were stored.";
 				$qdata["end"]    = microtime(true);
 				$qdata["time"]   = $qdata["end"] - $qdata["start"];
 				$easyQueryData[] = $qdata;
@@ -195,10 +197,10 @@ if (!function_exists("easyQuery")) {
 
 			} else {
 
-				// Si no hi ha res al array de retorn pero s'han retornat rows alguna cosa ha anat malament
-				// Guardem un missatge d'error i retornem FALSE
+				// If the return array is empty but rows have been returned something went wrong
+				// We store an error message and return FALSE
 
-				$qdata["error"] .= "S'han retornat ".$n_rows." rows pero s'han perdut els resultats en el procés.";
+				$qdata["error"] .= "The function returned ".$n_rows." rows but the results were lost in the process.";
 				$qdata["end"]    = microtime(true);
 				$qdata["time"]   = $qdata["end"] - $qdata["start"];
 				$easyQueryData[] = $qdata;
@@ -208,12 +210,12 @@ if (!function_exists("easyQuery")) {
 
 		} else {
 
-			// Si el número de rows retornat es igual a 0 significa que no s'ha retornat cap resultat.
-			// Guardem un missatge d'avís i el temps de finalització i retornem un array buit
-			// Es retorna un array buit i no FALSE perque no es un error com a tal
-			// Ja no es retorna NULL com es feia abans per a que no interfereixi amb iteracions
+			// If the returned row number equals 0 it means no results were returned.
+			// We store a warning message and the ending time and return an empty array.
+			// We retun an empty array and not FALSE cause this is not an error.
+			// We no longer return NULL like before to not break iterations.
 
-			$qdata["error"] .= "No s'ha retornat cap resultat.";
+			$qdata["error"] .= "No results were returned.";
 			$qdata["end"]    = microtime(true);
 			$qdata["time"]   = $qdata["end"] - $qdata["start"];
 			$easyQueryData[] = $qdata;
@@ -221,10 +223,10 @@ if (!function_exists("easyQuery")) {
 
 		}
 
-		// La funció mai hauria d'arribar a aquest punt perque totes les casualistiques acaben en return
-		// Tot i així, es guarda un missatge d'error per si acàs
+		// This point should never be reached as all possibilities end in return.
+		// Even then, we store an error message just in case.
 
-		if ($qdata["error"] == "") $qdata["error"] = "La funció s'ha executat fins al final. Error report: " . mysqli_error($conn) . " ";
+		if ($qdata["error"] == "") $qdata["error"] = "The function reached its ending. Error report: " . mysqli_error($conn) . " ";
 
 		$qdata["end"]    = microtime(true);
 		$qdata["time"]   = $qdata["end"] - $qdata["start"];
@@ -234,16 +236,16 @@ if (!function_exists("easyQuery")) {
 
 
 	/**
-	 * Funció que retorna un array amb totes les dades de la última consulta (o del número de consulta especificat)
+	 * Function which returns an array with all the data from the last operation (or of the specified operation number).
 	 *
-	 * @param int $n Número de la consulta de la que es volen rebre dades.
-	 *               Si es null es retornaràn dades de l'ultima consulta executada.
-	 *               Si es true es retornaràn dades de totes les consultes.
+	 * @param int $n Number of the operation you want to get data from.
+	 *               If NULL, it will return the last operation.
+	 *               If TRUE, it will return an array of all operations in this execution.
 	 *
-	 * @param string $key Clau de l'array de dades que es vol recuperar.
-	 *                    Si es null es retornaràn totes les dades de la consulta o consultes especificades.
+	 * @param string $key Key of the array that you want to recover.
+	 *                    If NULL it will return an array with all the data of the operation/s.
 	 *
-	 * @return mixed Es retornarà un string o un array (multi o unidimensional) depenent dels paràmetres introduïts.
+	 * @return mixed String or array (multi or one dimensional) depending on the parameters.
 	 */
 	function easyQueryData($n = null, $key = null) {
 
@@ -251,7 +253,7 @@ if (!function_exists("easyQuery")) {
 
 		$max = count($easyQueryData) - 1;
 
-		// Si $n es null vol dir que es retornarà l'ultima entrada de l'array de dades
+		// If $n is NULL it means the last entry will be returned.
 		if ($n === null) {
 
 			if ($key === null) {
@@ -266,7 +268,7 @@ if (!function_exists("easyQuery")) {
 			}
 
 
-		// Si $n es true es retornarà un array amb totes les dades o amb les que es demanin
+		// If $n is TRUE it will return an array with all the data or the data asked for.
 		} else if ($n === true) {
 
 			if ($key === null) {
@@ -287,7 +289,7 @@ if (!function_exists("easyQuery")) {
 			}
 
 
-		// Si $n es un número es retornarà les dades d'aquella consulta (o false si no existeix)
+		// If $n is a number it will return the data of that operation (or FALSE if it doesn't exist).
 		} else if (is_numeric($n)) {
 
 			if ($n > $max || $n < 0) {
@@ -309,7 +311,7 @@ if (!function_exists("easyQuery")) {
 
 			}
 
-		// Si no encaixa en cap cas es retornarà false
+		// If no case fits it will return FALSE.
 		} else {
 
 			return false;
@@ -319,13 +321,13 @@ if (!function_exists("easyQuery")) {
 	}
 
 	/**
-	 * Funció que retorna el missatge d'error de la última consulta (o del número de consulta especificat)
+	 * Function which returns the error message of the last operation (or the specified one).
 	 *
-	 * @param int $n Número de la consulta de la que es vol rebre l'error.
-	 *               Si es null es retornarà l'error de l'ultima consulta executada.
-	 *               Si es true es retornaràn els errors de totes les consultes.
+	 * @param int $n Number of the operation of which you want to get the error message from.
+	 *               If NULL, it will return the last operation.
+	 *               If TRUE, it will return an array of all operations in this execution.
 	 *
-	 * @return mixed Es retornarà un string o un array (multi o unidimensional) depenent dels paràmetres introduïts.
+	 * @return mixed String or array (multi or one dimensional) depending on the parameters.
 	 */
 	function easyQueryError($n = null) {
 
@@ -334,13 +336,13 @@ if (!function_exists("easyQuery")) {
 	}
 
 	/**
-	 * Funció que retorna un array amb el temps que va portar la última consulta (o del número de consulta especificat)
+	 * Function which returns the execution time of the last operation (or the specified one).
 	 *
-	 * @param int $n Número de la consulta de la que es vol rebre el temps d'execució.
-	 *               Si es null es retornarà el temps d'execució de l'ultima consulta executada.
-	 *               Si es true es retornaràn els temps d'execució de totes les consultes.
+	 * @param int $n Number of the operation of which you want to get the execution time from.
+	 *               If NULL, it will return the last operation.
+	 *               If TRUE, it will return an array of all operations in this execution.
 	 *
-	 * @return mixed Es retornarà un string o un array (multi o unidimensional) depenent dels paràmetres introduïts.
+	 * @return mixed String or array (multi or one dimensional) depending on the parameters.
 	 */
 	function easyQueryTime($n = null) {
 
