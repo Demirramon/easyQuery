@@ -76,6 +76,12 @@
 				if ($sqlp->execute()) {
 					
 					$results = $sqlp->get_result();
+					
+					if (is_bool($results)) {
+						$easyQueryData[] = $qdata;
+						return $results;
+					}
+					
 					$rows = $results->num_rows;
 					$return_array = array();
 					
@@ -158,6 +164,8 @@
 		function easyQueryLegacy($conn, $query, $params, $return) {
 			
 			GLOBAL $easyQueryData; // En cas d'error, aquesta variable ha de ser global per poder recuperar el missatge d'error.
+			
+			$conn = db_connect();
 			
 			$qdata = array(
 				/*"connection" => $conn,*/
