@@ -2,16 +2,15 @@
 
 GLOBAL $db, $db_VS, $db_AD, $db_COMU, $host;
 
-if (!function_exists("easyQuery")) {
 
-	/* Variable used by easyQuery and easyQueryError */
-	GLOBAL $easyQueryData;
-	$easyQueryData = array();
+if (!class_exists("mysqlpro")) {
+
+class mysqlpro extends mysqli {
+
+	private $easyQueryData = []; // Variable used by easyQuery and easyQueryError
 
 	/**
 	 * Function which facilitates the operations with the database and error control.
-	 *
-	 * @param object $conn  Connection to the database
 	 *
 	 * @param string $query String with the query/operation.
 	 *
@@ -28,15 +27,12 @@ if (!function_exists("easyQuery")) {
 	 *               If a writing operation succeeds it will return the number of affected rows. Note that it can be 0 even if it succeeds.
 	 *               If the operation fails it will return FALSE.
 	 */
-	function easyQuery($conn, $query, $params = null, $return_type = "s") {
-
-		GLOBAL $easyQueryData; // In case of error, this variable must be global to store the details.
+	function easyQuery($query, $params = null, $return_type = "s") {
 
 		if (is_numeric($return_type) && $return_type > 0) $return_type = "i";
 
 		// Array containing the current operation's data
 		$qdata = [
-			/*"connection" => $conn,*/
 			"query"      => $query,
 			"parameters" => $params,
 			"return"     => $return_type,
@@ -47,14 +43,11 @@ if (!function_exists("easyQuery")) {
 		];
 
 		// Checking the connection variable
-		if ($conn == null || !($conn instanceof mysqli) || gettype($conn) != "object" || $conn->connect_error) {
+		if ($this->connect_error) {
 
-			if      ($conn == null)              $qdata["error"] .= "The connection variable is null. ";
-			else if (!($conn instanceof mysqli)) $qdata["error"] .= "The connection variable is not a mysqli instance. ";
-			else if (gettype($conn) != "object") $qdata["error"] .= "The connection variable is not an object (" . gettype($conn) . "). ";
-			else if ($conn->connect_error)       $qdata["error"] .= "The connection variable has a connection error. ";
+			$qdata["error"] .= "The connection has an error. ";
 
-			$easyQueryData[] = $qdata;
+			$this->easyQueryData[] = $qdata;
 			return false;
 
 		}
@@ -62,7 +55,7 @@ if (!function_exists("easyQuery")) {
 		// Checking the operation variable
 		if ($query == null) {
 			$qdata["error"] .= "The query is empty.";
-			$easyQueryData[] = $qdata;
+			$this->easyQueryData[] = $qdata;
 			return false;
 		}
 
@@ -73,7 +66,7 @@ if (!function_exists("easyQuery")) {
 		if (is_array($params) && count($params) > 0) {
 
 			// We prepare the query
-			if ($sqlp = $conn->prepare($query)) {
+			if ($sqlp = $this->prepare($query)) {
 
 				// Parameter binding
 
@@ -86,8 +79,8 @@ if (!function_exists("easyQuery")) {
 
 				// Error control
 				if ($bind_param == false) {
-					$qdata["error"] .= "Parameters have not been binded: " . mysqli_error($conn);
-					$easyQueryData[] = $qdata;
+					$qdata["error"] .= "Parameters have not been binded: " . mysqli_error($this);
+					$this->easyQueryData[] = $qdata;
 					return false;
 				}
 
@@ -100,10 +93,10 @@ if (!function_exists("easyQuery")) {
 
 					// The query could not be executed. We store the details of the error, ending time and return FALSE.
 
-					$qdata["error"] .= "Execute error: " . mysqli_error($conn) . " ";
+					$qdata["error"] .= "Execute error: " . mysqli_error($this) . " ";
 					$qdata["end"]    = microtime(true);
 					$qdata["time"]   = $qdata["end"] - $qdata["start"];
-					$easyQueryData[] = $qdata;
+					$this->easyQueryData[] = $qdata;
 					return false;
 
 				}
@@ -112,10 +105,10 @@ if (!function_exists("easyQuery")) {
 
 				// The query could not be prepared. We store the details of the error, ending time and return FALSE.
 
-				$qdata["error"] .= "Prepare error: " . mysqli_error($conn) . " ";
+				$qdata["error"] .= "Prepare error: " . mysqli_error($this) . " ";
 				$qdata["end"]    = microtime(true);
 				$qdata["time"]   = $qdata["end"] - $qdata["start"];
-				$easyQueryData[] = $qdata;
+				$this->easyQueryData[] = $qdata;
 				return false;
 
 			}
@@ -124,12 +117,12 @@ if (!function_exists("easyQuery")) {
 		// This is done so operations like CHECK TABLE, which don't support prepared statements, can be executed
 		} else {
 
-			if (!($results = $conn->query($query, MYSQLI_STORE_RESULT))) {
+			if (!($results = $this->query($query, MYSQLI_STORE_RESULT))) {
 
-				$qdata["error"] .= "Execution error with no prepare: " . mysqli_error($conn) . " ";
+				$qdata["error"] .= "Execution error with no prepare: " . mysqli_error($this) . " ";
 				$qdata["end"]    = microtime(true);
 				$qdata["time"]   = $qdata["end"] - $qdata["start"];
-				$easyQueryData[] = $qdata;
+				$this->easyQueryData[] = $qdata;
 				return false;
 
 			}
@@ -147,11 +140,11 @@ if (!function_exists("easyQuery")) {
 
 			// We return the number of affected rows
 
-			$affected_rows = mysqli_affected_rows($conn);
+			$affected_rows = mysqli_affected_rows($this);
 
 			$qdata["end"]    = microtime(true);
 			$qdata["time"]   = $qdata["end"] - $qdata["start"];
-			$easyQueryData[] = $qdata;
+			$this->easyQueryData[] = $qdata;
 
 			return $affected_rows;
 
@@ -191,7 +184,7 @@ if (!function_exists("easyQuery")) {
 				$qdata["error"]  = "The function has executed properly and the results were stored.";
 				$qdata["end"]    = microtime(true);
 				$qdata["time"]   = $qdata["end"] - $qdata["start"];
-				$easyQueryData[] = $qdata;
+				$this->easyQueryData[] = $qdata;
 
 				return $return_array;
 
@@ -203,7 +196,7 @@ if (!function_exists("easyQuery")) {
 				$qdata["error"] .= "The function returned ".$n_rows." rows but the results were lost in the process.";
 				$qdata["end"]    = microtime(true);
 				$qdata["time"]   = $qdata["end"] - $qdata["start"];
-				$easyQueryData[] = $qdata;
+				$this->easyQueryData[] = $qdata;
 				return false;
 
 			}
@@ -218,7 +211,7 @@ if (!function_exists("easyQuery")) {
 			$qdata["error"] .= "No results were returned.";
 			$qdata["end"]    = microtime(true);
 			$qdata["time"]   = $qdata["end"] - $qdata["start"];
-			$easyQueryData[] = $qdata;
+			$this->easyQueryData[] = $qdata;
 			return [];
 
 		}
@@ -226,11 +219,11 @@ if (!function_exists("easyQuery")) {
 		// This point should never be reached as all possibilities end in return.
 		// Even then, we store an error message just in case.
 
-		if ($qdata["error"] == "") $qdata["error"] = "The function reached its ending. Error report: " . mysqli_error($conn) . " ";
+		if ($qdata["error"] == "") $qdata["error"] = "The function reached its ending. Error report: " . mysqli_error($this) . " ";
 
 		$qdata["end"]    = microtime(true);
 		$qdata["time"]   = $qdata["end"] - $qdata["start"];
-		$easyQueryData[] = $qdata;
+		$this->easyQueryData[] = $qdata;
 
 	}
 
@@ -249,21 +242,19 @@ if (!function_exists("easyQuery")) {
 	 */
 	function easyQueryData($n = null, $key = null) {
 
-		GLOBAL $easyQueryData;
-
-		$max = count($easyQueryData) - 1;
+		$max = count($this->easyQueryData) - 1;
 
 		// If $n is NULL it means the last entry will be returned.
 		if ($n === null) {
 
 			if ($key === null) {
 
-				return $easyQueryData[$max];
+				return $this->easyQueryData[$max];
 
 			} else {
 
-				if (isset($easyQueryData[$max][$key])) return $easyQueryData[$max][$key];
-				else                                   return null;
+				if (isset($this->easyQueryData[$max][$key])) return $this->easyQueryData[$max][$key];
+				else                                         return null;
 
 			}
 
@@ -273,13 +264,13 @@ if (!function_exists("easyQuery")) {
 
 			if ($key === null) {
 
-				return $easyQueryData;
+				return $this->easyQueryData;
 
 			} else {
 
 				$array_return = [];
 
-				foreach ($easyQueryData as $i => $queryData) {
+				foreach ($this->easyQueryData as $i => $queryData) {
 					if (isset($queryData[$key])) $array_return[] = $queryData[$key];
 					else                         $array_return[] = null;
 				}
@@ -300,11 +291,11 @@ if (!function_exists("easyQuery")) {
 
 				if ($key === null) {
 
-					return $easyQueryData[$n];
+					return $this->easyQueryData[$n];
 
 				} else {
 
-					if (isset($easyQueryData[$n][$key])) return $easyQueryData[$n][$key];
+					if (isset($this->easyQueryData[$n][$key])) return $this->easyQueryData[$n][$key];
 					else                                 return null;
 
 				}
@@ -350,6 +341,7 @@ if (!function_exists("easyQuery")) {
 
 	}
 
+	}
 }
 
 ?>
