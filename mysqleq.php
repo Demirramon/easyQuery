@@ -19,9 +19,6 @@ if (!class_exists("mysqleq")) {
 		 *                      The rest of the values are the variables to bind in order.
 		 *                      If no parameters have to be binded, a NULL or empty array can be passed.
 		 *
-		 * @param string $return_type ///TO BE DEPRECATED/// If the query is a SELECT, kind of keys to use in the return.
-		 *                            If the value equals "i" the array will use numeric keys, if not it will use the column names.
-		 *
 		 * @return mixed If a query succeeds and returns something it will be a bidimensional array containing rows, which will contain the column values.
 		 *               If a query succeeds but returns nothing it will return an empty array.
 		 *               If a writing operation succeeds it will return the number of affected rows. Note that it can be 0 even if it succeeds.
