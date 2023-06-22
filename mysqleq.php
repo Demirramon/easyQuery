@@ -5,12 +5,12 @@ GLOBAL $db, $db_VS, $db_AD, $db_COMU, $host;
 
 if (!class_exists("mysqleq")) {
 
-class mysqleq extends mysqli {
+    class mysqleq extends mysqli {
 
 		private $easyQueryData = []; // Variable used by easyQuery and easyQueryError
 
 		/**
-		 * Function which facilitates the operations with the database and error control.
+		 * Facilitates the operations with the database and error control.
 		 *
 		 * @param string $query String with the query/operation.
 		 *
@@ -211,7 +211,7 @@ class mysqleq extends mysqli {
 
 
 		/**
-		 * Function which returns an array with all the data from the last operation (or of the specified operation number).
+		 * Returns an array with all the data from the last operation (or of the specified operation number).
 		 *
 		 * @param int $n Number of the operation you want to get data from.
 		 *               If NULL, it will return the last operation.
@@ -294,7 +294,7 @@ class mysqleq extends mysqli {
 		}
 
 		/**
-		 * Function which returns the error message of the last operation (or the specified one).
+		 * Returns the error message of the last operation (or the specified one).
 		 *
 		 * @param int $n Number of the operation of which you want to get the error message from.
 		 *               If NULL, it will return the last operation.
@@ -309,7 +309,7 @@ class mysqleq extends mysqli {
 		}
 
 		/**
-		 * Function which returns the execution time of the last operation (or the specified one).
+		 * Returns the execution time of the last operation (or the specified one).
 		 *
 		 * @param int $n Number of the operation of which you want to get the execution time from.
 		 *               If NULL, it will return the last operation.
