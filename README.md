@@ -1,8 +1,8 @@
-# easyQuery / mysqlpro
+# easyQuery / mysqleq
 PHP library used to make MySQLi queries simpler and more easier to control.
 
-## MySQLPro
-**MySQLPro** is the library that extends MySQLi to add the **easyQuery** functionality while keeping everything from its parent.
+## mysqleq
+**mysqleq** is the library that extends MySQLi to add the **easyQuery** functionality while keeping everything from its parent.
 
 ## easyQuery
 EasyQuery is the function that allows for easier and quicker to write operations to the database and adds improvements to conventional queries.
@@ -20,8 +20,8 @@ EasyQuery is the function that allows for easier and quicker to write operations
 Doing queries with easyQuery is, as the name indicates, easy.
 
 ~~~
-// We execute a query on our database connection (mysqlpro object) and store the results.
-$sql = $mysqlpro->easyQuery("SELECT id, name, surname FROM users");
+// We execute a query on our database connection (mysqleq object) and store the results.
+$sql = $mysqleq->easyQuery("SELECT id, name, surname FROM users");
 
 // We iterate the returned array
 foreach ($sql as $key => $value) {
@@ -43,7 +43,7 @@ Errors are easy to control using the different kinds of return values.
 Checking if a query has failed or not is as easy as checking **if the returned value is an array or not**, as an error will return **FALSE**.
 
 ~~~
-$sql = $mysqlpro->easyQuery("SELECT id, name, surname FROM users");
+$sql = $mysqleq->easyQuery("SELECT id, name, surname FROM users");
 
 // If there are no errors
 if (is_array($sql)) {
@@ -62,6 +62,6 @@ if (is_array($sql)) {
 
 // If something goes wrong
 } else {
-    echo "ERROR READING USERS: " . $mysqlpro->easyQueryError();
+    echo "ERROR READING USERS: " . $mysqleq->easyQueryError();
 }
 ~~~
