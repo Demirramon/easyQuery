@@ -3,9 +3,9 @@
 GLOBAL $db, $db_VS, $db_AD, $db_COMU, $host;
 
 
-if (!class_exists("mysqlpro")) {
+if (!class_exists("mysqleq")) {
 
-class mysqlpro extends mysqli {
+class mysqleq extends mysqli {
 
 		private $easyQueryData = []; // Variable used by easyQuery and easyQueryError
 
