@@ -1,5 +1,5 @@
 # easyQuery / mysqleq
-PHP library used to make MySQLi queries simpler and more easier to control.
+PHP library used to make MySQLi queries simpler and easier to control.
 
 ## mysqleq
 **mysqleq** is the library that extends MySQLi to add the **easyQuery** functionality while keeping everything from its parent.

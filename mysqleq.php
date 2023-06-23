@@ -1,10 +1,10 @@
 <?php
 
-GLOBAL $db, $db_VS, $db_AD, $db_COMU, $host;
-
-
 if (!class_exists("mysqleq")) {
 
+	/**
+	 * PHP library used to make MySQLi queries simpler and easier to control.
+	 */
     class mysqleq extends mysqli {
 
 		private $easyQueryData = []; // Variable used by easyQuery and easyQueryError
