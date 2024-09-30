@@ -74,7 +74,7 @@ if (!class_exists("mysqleq")) {
 
 						} else {
 							// Checks if the type is b (blob) and stores the value away
-							if ($params[0][$key] == "b") {
+							if ($params[0][$key-1] == "b") {
 								$params_ref[$key] = null;
 								$params_long_data[$key] = $value;
 
