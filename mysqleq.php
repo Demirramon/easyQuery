@@ -66,10 +66,35 @@ if (!class_exists("mysqleq")) {
 
 					// We create the references
 					$params_ref = [];
-					foreach($params as $key => $value) $params_ref[$key] = &$params[$key];
+					$params_long_data = [];
+					foreach($params as $key => $value) {
+						// No need to reference the parameter types string
+						if ($key == 0) {
+							$params_ref[$key] = $value;
+
+						} else {
+							// Checks if the type is b (blob) and stores the value away
+							if ($params[0][$key-1] == "b") {
+								$null = null;
+								$params_ref[$key] = $null;
+								$params_long_data[$key] = $value;
+
+							// We create a reference for all other parameter types
+							} else {
+								$params_ref[$key] = &$params[$key];
+							}
+						}
+					}
 
 					// bind_param execution
 					$bind_param = call_user_func_array([$sqlp, "bind_param"], $params_ref);
+
+					// We execute send_long_data for each blob found within the parameters
+					if (count($params_long_data) > 0) {
+						foreach ($params_long_data as $key => $blob) {
+							$sqlp->send_long_data($key-1, $blob);
+						}
+					}
 
 					// Error control
 					if ($bind_param == false) {
