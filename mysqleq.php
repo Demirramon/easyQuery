@@ -24,16 +24,18 @@ if (!class_exists("mysqleq")) {
 		 *               If a writing operation succeeds it will return the number of affected rows. Note that it can be 0 even if it succeeds.
 		 *               If the operation fails it will return FALSE.
 		 */
-		function easyQuery($query, $params = null) {
+		function easyQuery(string $query, array $params = null) {
 
 			// Array containing the current operation's data
 			$qdata = [
-				"query"      => $query,
-				"parameters" => $params,
-				"error"      => "",
-				"start"      => microtime(true),
-				"end"        => null,
-				"time"       => null
+				"query"         => $query,
+				"parameters"    => $params,
+				"error"         => "",
+				"start"         => microtime(true),
+				"end"           => null,
+				"time"          => null,
+				"affected_rows" => null,
+				"insert_id"     => null
 			];
 
 			// Checking the connection variable
@@ -66,51 +68,16 @@ if (!class_exists("mysqleq")) {
 
 					// We create the references
 					$params_ref = [];
-					$params_long_data = [];
-					foreach($params as $key => $value) {
-						// No need to reference the parameter types string
-						if ($key == 0) {
-							$params_ref[$key] = $value;
-
-						} else {
-							// Checks if the type is b (blob) and stores the value away
-							if ($params[0][$key-1] == "b") {
-								$null = null;
-								$params_ref[$key] = $null;
-								$params_long_data[$key] = $value;
-
-							// We create a reference for all other parameter types
-							} else {
-								$params_ref[$key] = &$params[$key];
-							}
-						}
-					}
+					foreach($params as $key => $value) $params_ref[$key] = &$params[$key];
 
 					// bind_param execution
-					$bind_param = call_user_func_array([$sqlp, "bind_param"], $params_ref);
-
-					// We execute send_long_data for each blob found within the parameters
-					if (count($params_long_data) > 0) {
-						foreach ($params_long_data as $key => $blob) {
-							$sqlp->send_long_data($key-1, $blob);
-						}
-					}
+					@$bind_param = call_user_func_array([$sqlp, "bind_param"], $params_ref);
 
 					// Error control
 					if ($bind_param == false) {
-
-						$type_total   = strlen($params[0]);
-						$param_total  = count($params)-1;
-						$symbol_total = substr_count($query, "?");
-
-						if      ($type_total  != $param_total)  $qdata["error"] .= "Parameter binding error - ammount of types and values do not match (".$type_total."/".$param_total.").";
-						else if ($param_total != $symbol_total) $qdata["error"] .= "Parameter binding error - ammount of question marks and values do not match (".$symbol_total."/".$param_total.").";
-						else                                    $qdata["error"] .= "Parameter binding error - " . $this->error;
-
-						$qdata["error"] .= "Parameters have not been binded: " . $this->error;
+						$qdata["error"] .= "Parameters have not been binded: " . mysqli_error($this);
 						$this->easyQueryData[] = $qdata;
 						return false;
-
 					}
 
 					// We execute the query
@@ -122,7 +89,7 @@ if (!class_exists("mysqleq")) {
 
 						// The query could not be executed. We store the details of the error, ending time and return FALSE.
 
-						$qdata["error"] .= "Execute error: " . $this->error . " ";
+						$qdata["error"] .= "Execute error: " . mysqli_error($this) . " ";
 						$qdata["end"]    = microtime(true);
 						$qdata["time"]   = $qdata["end"] - $qdata["start"];
 						$this->easyQueryData[] = $qdata;
@@ -134,7 +101,7 @@ if (!class_exists("mysqleq")) {
 
 					// The query could not be prepared. We store the details of the error, ending time and return FALSE.
 
-					$qdata["error"] .= "Prepare error: " . $this->error . " ";
+					$qdata["error"] .= "Prepare error: " . mysqli_error($this) . " ";
 					$qdata["end"]    = microtime(true);
 					$qdata["time"]   = $qdata["end"] - $qdata["start"];
 					$this->easyQueryData[] = $qdata;
@@ -148,7 +115,7 @@ if (!class_exists("mysqleq")) {
 
 				if (!($results = $this->query($query, MYSQLI_STORE_RESULT))) {
 
-					$qdata["error"] .= "Execution error with no prepare: " . $this->error . " ";
+					$qdata["error"] .= "Execution error with no prepare: " . mysqli_error($this) . " ";
 					$qdata["end"]    = microtime(true);
 					$qdata["time"]   = $qdata["end"] - $qdata["start"];
 					$this->easyQueryData[] = $qdata;
@@ -167,12 +134,15 @@ if (!class_exists("mysqleq")) {
 			// If the number of rows equals NULL it means it was not a SELECT
 			if ($n_rows === null) {
 
-				// We return the number of affected rows
+				// We save query info and return the number of affected rows
 
-				$affected_rows = mysqli_affected_rows($this);
+				$affected_rows = $this->affected_rows;
+				$insert_id     = $this->insert_id;
 
-				$qdata["end"]    = microtime(true);
-				$qdata["time"]   = $qdata["end"] - $qdata["start"];
+				$qdata["end"]           = microtime(true);
+				$qdata["time"]          = $qdata["end"] - $qdata["start"];
+				$qdata["affected_rows"] = $affected_rows;
+				$qdata["insert_id"]     = $insert_id;
 				$this->easyQueryData[] = $qdata;
 
 				return $affected_rows;
@@ -233,7 +203,7 @@ if (!class_exists("mysqleq")) {
 			// This point should never be reached as all possibilities end in return.
 			// Even then, we store an error message just in case.
 
-			if ($qdata["error"] == "") $qdata["error"] = "The function reached its ending. Error report: " . $this->error . " ";
+			if ($qdata["error"] == "") $qdata["error"] = "The function reached its ending. Error report: " . mysqli_error($this) . " ";
 
 			$qdata["end"]    = microtime(true);
 			$qdata["time"]   = $qdata["end"] - $qdata["start"];
@@ -332,7 +302,7 @@ if (!class_exists("mysqleq")) {
 		 *               If NULL, it will return the last operation.
 		 *               If TRUE, it will return an array of all operations in this execution.
 		 *
-		 * @return mixed String or array (multi or one dimensional) depending on the parameters.
+		 * @return string Error message.
 		 */
 		function easyQueryError($n = null) {
 
@@ -347,11 +317,11 @@ if (!class_exists("mysqleq")) {
 		 *               If NULL, it will return the last operation.
 		 *               If TRUE, it will return an array of all operations in this execution.
 		 *
-		 * @return mixed String or array (multi or one dimensional) depending on the parameters.
+		 * @return int Time in miliseconds
 		 */
 		function easyQueryTime($n = null) {
 
-			return easyQueryData($n, "time");
+			return $this->easyQueryData($n, "time");
 
 		}
 
