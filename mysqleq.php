@@ -306,7 +306,22 @@ if (!class_exists("mysqleq")) {
 		 */
 		function easyQueryError($n = null) {
 
-			return easyQueryData($n, "error");
+			return $this->easyQueryData($n, "error");
+
+		}
+
+		/**
+		 * Returns the insert ID the last operation (or the specified one).
+		 *
+		 * @param int $n Number of the operation of which you want to get the error message from.
+		 *               If NULL, it will return the last operation.
+		 *               If TRUE, it will return an array of all operations in this execution.
+		 *
+		 * @return int Insert ID
+		 */
+		function easyQueryInsertId($n = null) {
+
+			return $this->easyQueryData($n, "insert_id");
 
 		}
 
