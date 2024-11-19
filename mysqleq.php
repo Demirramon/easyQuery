@@ -101,7 +101,7 @@ if (!class_exists("mysqleq")) {
 
 					// The query could not be prepared. We store the details of the error, ending time and return FALSE.
 
-					$qdata["error"] .= "Prepare error: " . mysqli_error($this) . " ";
+					$qdata["error"] .= "Prepare error: " . $this->error . " ";
 					$qdata["end"]    = microtime(true);
 					$qdata["time"]   = $qdata["end"] - $qdata["start"];
 					$this->easyQueryData[] = $qdata;
@@ -115,7 +115,7 @@ if (!class_exists("mysqleq")) {
 
 				if (!($results = $this->query($query, MYSQLI_STORE_RESULT))) {
 
-					$qdata["error"] .= "Execution error with no prepare: " . mysqli_error($this) . " ";
+					$qdata["error"] .= "Execution error with no prepare: " . $this->error . " ";
 					$qdata["end"]    = microtime(true);
 					$qdata["time"]   = $qdata["end"] - $qdata["start"];
 					$this->easyQueryData[] = $qdata;
