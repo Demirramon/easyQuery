@@ -24,16 +24,18 @@ if (!class_exists("mysqleq")) {
 		 *               If a writing operation succeeds it will return the number of affected rows. Note that it can be 0 even if it succeeds.
 		 *               If the operation fails it will return FALSE.
 		 */
-		function easyQuery($query, $params = null) {
+		function easyQuery(string $query, array $params = null) {
 
 			// Array containing the current operation's data
 			$qdata = [
-				"query"      => $query,
-				"parameters" => $params,
-				"error"      => "",
-				"start"      => microtime(true),
-				"end"        => null,
-				"time"       => null
+				"query"         => $query,
+				"parameters"    => $params,
+				"error"         => "",
+				"start"         => microtime(true),
+				"end"           => null,
+				"time"          => null,
+				"affected_rows" => null,
+				"insert_id"     => null
 			];
 
 			// Checking the connection variable
@@ -69,7 +71,7 @@ if (!class_exists("mysqleq")) {
 					foreach($params as $key => $value) $params_ref[$key] = &$params[$key];
 
 					// bind_param execution
-					$bind_param = call_user_func_array([$sqlp, "bind_param"], $params_ref);
+					@$bind_param = call_user_func_array([$sqlp, "bind_param"], $params_ref);
 
 					// Error control
 					if ($bind_param == false) {
@@ -99,7 +101,7 @@ if (!class_exists("mysqleq")) {
 
 					// The query could not be prepared. We store the details of the error, ending time and return FALSE.
 
-					$qdata["error"] .= "Prepare error: " . mysqli_error($this) . " ";
+					$qdata["error"] .= "Prepare error: " . $this->error . " ";
 					$qdata["end"]    = microtime(true);
 					$qdata["time"]   = $qdata["end"] - $qdata["start"];
 					$this->easyQueryData[] = $qdata;
@@ -113,7 +115,7 @@ if (!class_exists("mysqleq")) {
 
 				if (!($results = $this->query($query, MYSQLI_STORE_RESULT))) {
 
-					$qdata["error"] .= "Execution error with no prepare: " . mysqli_error($this) . " ";
+					$qdata["error"] .= "Execution error with no prepare: " . $this->error . " ";
 					$qdata["end"]    = microtime(true);
 					$qdata["time"]   = $qdata["end"] - $qdata["start"];
 					$this->easyQueryData[] = $qdata;
@@ -132,12 +134,15 @@ if (!class_exists("mysqleq")) {
 			// If the number of rows equals NULL it means it was not a SELECT
 			if ($n_rows === null) {
 
-				// We return the number of affected rows
+				// We save query info and return the number of affected rows
 
-				$affected_rows = mysqli_affected_rows($this);
+				$affected_rows = $this->affected_rows;
+				$insert_id     = $this->insert_id;
 
-				$qdata["end"]    = microtime(true);
-				$qdata["time"]   = $qdata["end"] - $qdata["start"];
+				$qdata["end"]           = microtime(true);
+				$qdata["time"]          = $qdata["end"] - $qdata["start"];
+				$qdata["affected_rows"] = $affected_rows;
+				$qdata["insert_id"]     = $insert_id;
 				$this->easyQueryData[] = $qdata;
 
 				return $affected_rows;
@@ -297,11 +302,26 @@ if (!class_exists("mysqleq")) {
 		 *               If NULL, it will return the last operation.
 		 *               If TRUE, it will return an array of all operations in this execution.
 		 *
-		 * @return mixed String or array (multi or one dimensional) depending on the parameters.
+		 * @return string Error message.
 		 */
 		function easyQueryError($n = null) {
 
-			return easyQueryData($n, "error");
+			return $this->easyQueryData($n, "error");
+
+		}
+
+		/**
+		 * Returns the insert ID the last operation (or the specified one).
+		 *
+		 * @param int $n Number of the operation of which you want to get the error message from.
+		 *               If NULL, it will return the last operation.
+		 *               If TRUE, it will return an array of all operations in this execution.
+		 *
+		 * @return int Insert ID
+		 */
+		function easyQueryInsertId($n = null) {
+
+			return $this->easyQueryData($n, "insert_id");
 
 		}
 
@@ -312,11 +332,11 @@ if (!class_exists("mysqleq")) {
 		 *               If NULL, it will return the last operation.
 		 *               If TRUE, it will return an array of all operations in this execution.
 		 *
-		 * @return mixed String or array (multi or one dimensional) depending on the parameters.
+		 * @return int Time in miliseconds
 		 */
 		function easyQueryTime($n = null) {
 
-			return easyQueryData($n, "time");
+			return $this->easyQueryData($n, "time");
 
 		}
 
