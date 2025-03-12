@@ -88,7 +88,7 @@ if (!class_exists("mysqleq")) {
 					}
 
 					// bind_param execution
-					$bind_param = call_user_func_array([$sqlp, "bind_param"], $params_ref);
+					@$bind_param = $sqlp->bind_param(...$params_ref);
 
 					// We run send_long_data for each blob found in the parameters
 					if (count($params_long_data) > 0) {
