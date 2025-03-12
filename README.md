@@ -31,7 +31,7 @@ foreach ($sql as $key => $value) {
 	$surname = $value["surname"];
 
 	// We use the data however we want
-	echo "ID: " . $id . ", Name: " . $name . " " . $surname . ".";
+	echo "ID: " . $id . ", Name: " . $name . " " . $surname . ".\n";
 
 }
 ~~~
@@ -43,25 +43,27 @@ Errors are easy to control using the different kinds of return values.
 Checking if a query has failed or not is as easy as checking **if the returned value is an array or not**, as an error will return **FALSE**.
 
 ~~~
+// Query execution
 $sql = $mysqleq->easyQuery("SELECT id, name, surname FROM users");
 
-// If there are no errors
-if (is_array($sql)) {
+// If something goes wrong the result will be FALSE and not an array
+if (!is_array($sql)) {
+    throw new Exception("ERROR READING USERS: " . $mysqleq->easyQueryError());
+}
 
-    foreach ($sql as $key => $value) {
+// If the query returns no results it will be an empty array
+if (!count($sql)) {
+    die("No users found.");
+}
 
-        $id      = $value["id"];
-        $name    = $value["name"];
-        $surname = $value["surname"];
+// Iterates through the results
+foreach ($sql as $key => $value) {
 
-        echo "ID: " . $id . ", Name: " . $name . " " . $surname . ".";
+    $id      = $value["id"];
+    $name    = $value["name"];
+    $surname = $value["surname"];
 
-    }
+    echo "ID: " . $id . ", Name: " . $name . " " . $surname . ".\n";
 
-    if ($sql === []) echo "No users found.";
-
-// If something goes wrong
-} else {
-    echo "ERROR READING USERS: " . $mysqleq->easyQueryError();
 }
 ~~~
