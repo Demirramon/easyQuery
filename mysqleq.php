@@ -66,16 +66,50 @@ if (!class_exists("mysqleq")) {
 
 					// We create the references
 					$params_ref = [];
-					foreach($params as $key => $value) $params_ref[$key] = &$params[$key];
+					$params_long_data = [];
+					foreach($params as $key => $value) {
+						// No need to reference the parameter types string
+						if ($key == 0) {
+							$params_ref[$key] = $value;
+
+						} else {
+							// Checks if the type is b (blob) and stores the value away
+							if ($params[0][$key-1] == "b") {
+								$params_ref[$key] = null;
+								$params_long_data[$key] = $value;
+
+							// We create a reference for all other parameter types
+							} else {
+								$params_ref[$key] = &$params[$key];
+							}
+						}
+					}
 
 					// bind_param execution
 					$bind_param = call_user_func_array([$sqlp, "bind_param"], $params_ref);
 
+					// We run send_long_data for each blob found in the parameters
+					if (count($params_long_data) > 0) {
+						foreach ($params_long_data as $key => $blob) {
+							$sqlp->send_long_data($key, $blob);
+						}
+					}
+
 					// Error control
 					if ($bind_param == false) {
-						$qdata["error"] .= "Parameters have not been binded: " . mysqli_error($this);
+
+						$type_total   = strlen($params[0]);
+						$param_total  = count($params)-1;
+						$symbol_total = substr_count($query, "?");
+
+						if      ($type_total  != $param_total)  $qdata["error"] .= "Parameter binding error - ammount of types and values do not match (".$type_total."/".$param_total.").";
+						else if ($param_total != $symbol_total) $qdata["error"] .= "Parameter binding error - ammount of question marks and values do not match (".$symbol_total."/".$param_total.").";
+						else                                    $qdata["error"] .= "Parameter binding error - " . $this->error;
+
+						$qdata["error"] .= "Parameters have not been binded: " . $this->error;
 						$this->easyQueryData[] = $qdata;
 						return false;
+
 					}
 
 					// We execute the query
@@ -87,7 +121,7 @@ if (!class_exists("mysqleq")) {
 
 						// The query could not be executed. We store the details of the error, ending time and return FALSE.
 
-						$qdata["error"] .= "Execute error: " . mysqli_error($this) . " ";
+						$qdata["error"] .= "Execute error: " . $this->error . " ";
 						$qdata["end"]    = microtime(true);
 						$qdata["time"]   = $qdata["end"] - $qdata["start"];
 						$this->easyQueryData[] = $qdata;
@@ -99,7 +133,7 @@ if (!class_exists("mysqleq")) {
 
 					// The query could not be prepared. We store the details of the error, ending time and return FALSE.
 
-					$qdata["error"] .= "Prepare error: " . mysqli_error($this) . " ";
+					$qdata["error"] .= "Prepare error: " . $this->error . " ";
 					$qdata["end"]    = microtime(true);
 					$qdata["time"]   = $qdata["end"] - $qdata["start"];
 					$this->easyQueryData[] = $qdata;
@@ -113,7 +147,7 @@ if (!class_exists("mysqleq")) {
 
 				if (!($results = $this->query($query, MYSQLI_STORE_RESULT))) {
 
-					$qdata["error"] .= "Execution error with no prepare: " . mysqli_error($this) . " ";
+					$qdata["error"] .= "Execution error with no prepare: " . $this->error . " ";
 					$qdata["end"]    = microtime(true);
 					$qdata["time"]   = $qdata["end"] - $qdata["start"];
 					$this->easyQueryData[] = $qdata;
@@ -198,7 +232,7 @@ if (!class_exists("mysqleq")) {
 			// This point should never be reached as all possibilities end in return.
 			// Even then, we store an error message just in case.
 
-			if ($qdata["error"] == "") $qdata["error"] = "The function reached its ending. Error report: " . mysqli_error($this) . " ";
+			if ($qdata["error"] == "") $qdata["error"] = "The function reached its ending. Error report: " . $this->error . " ";
 
 			$qdata["end"]    = microtime(true);
 			$qdata["time"]   = $qdata["end"] - $qdata["start"];
