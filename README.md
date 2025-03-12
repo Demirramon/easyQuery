@@ -31,7 +31,30 @@ foreach ($sql as $key => $value) {
 	$surname = $value["surname"];
 
 	// We use the data however we want
-	echo "ID: " . $id . ", Name: " . $name . " " . $surname . ".";
+	echo "ID: " . $id . ", Name: " . $name . " " . $surname . ".\n";
+
+}
+~~~
+
+#### Parameters
+
+Passing parameters is easier than ever. You must pass an array with the contents you would normally input into bind_param.
+The first entry of this array should be a string with characters representing the type of every variable, and the rest should be the values in question.
+As opposed to using bind_param in mysqli, you can directly input values without needing a variable for each.
+
+~~~
+// We execute a query with a parameter array
+$sql = $mysqleq->easyQuery("SELECT id, name, surname FROM users WHERE id > ?", ["i", 10]);
+
+// We iterate the returned array
+foreach ($sql as $key => $value) {
+
+	$id      = $value["id"];
+	$name    = $value["name"];
+	$surname = $value["surname"];
+
+	// We use the data however we want
+	echo "ID: " . $id . ", Name: " . $name . " " . $surname . ".\n";
 
 }
 ~~~
@@ -45,23 +68,24 @@ Checking if a query has failed or not is as easy as checking **if the returned v
 ~~~
 $sql = $mysqleq->easyQuery("SELECT id, name, surname FROM users");
 
-// If there are no errors
-if (is_array($sql)) {
+// If something goes wrong the result will be FALSE and not an array
+if (!is_array($sql)) {
+    throw new Exception("ERROR READING USERS: " . $mysqleq->easyQueryError());
+}
 
-    foreach ($sql as $key => $value) {
+// If the query returns no results it will be an empty array
+if (!count($sql)) {
+    die("No users found.");
+}
 
-        $id      = $value["id"];
-        $name    = $value["name"];
-        $surname = $value["surname"];
+// Iterates through the results
+foreach ($sql as $key => $value) {
 
-        echo "ID: " . $id . ", Name: " . $name . " " . $surname . ".";
+    $id      = $value["id"];
+    $name    = $value["name"];
+    $surname = $value["surname"];
 
-    }
+    echo "ID: " . $id . ", Name: " . $name . " " . $surname . ".\n";
 
-    if ($sql === []) echo "No users found.";
-
-// If something goes wrong
-} else {
-    echo "ERROR READING USERS: " . $mysqleq->easyQueryError();
 }
 ~~~
